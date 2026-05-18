@@ -1,0 +1,29 @@
+[workspace]
+name = "marl-intro"
+version = "0.1.0"
+description = "Small MARL seminar experiments and environment smoke tests."
+channels = ["conda-forge", "pytorch", "nvidia"]
+channel-priority = "disabled"
+platforms = ["linux-64"]
+conda-pypi-map = { "conda-forge" = "conda-pypi-map.json", "pytorch" = "conda-pypi-map.json", "nvidia" = "conda-pypi-map.json" }
+
+[dependencies]
+python = { version = ">=3.11,<3.12", channel = "conda-forge" }
+pip = { version = "*", channel = "conda-forge" }
+matplotlib = { version = ">=3.8", channel = "conda-forge" }
+pillow = { version = ">=10.0", channel = "conda-forge" }
+requests = { version = ">=2.32", channel = "conda-forge" }
+pytorch = { version = "==2.5.1", build = "py3.11_cuda11.8_cudnn9.1.0_0", channel = "pytorch" }
+pytorch-cuda = "11.8.*"
+
+[pypi-dependencies]
+"marl-intro" = { path = ".", editable = true }
+"jax" = { version = ">=0.10.0, <0.11", extras = ["cuda12"] }
+jumanji = ">=1.1.0"
+torchrl = ">=0.12.0, <0.13"
+tensordict = ">=0.8,<0.13"
+
+[tasks]
+cleaner-smoke = "python scripts/cleaner_smoke.py --height 8 --width 8 --num-agents 3 --num-envs 4 --rollout-length 32"
+torchrl-smoke = "python scripts/torchrl_jumanji_smoke.py --height 8 --width 8 --num-agents 3 --num-envs 4"
+ppo-smoke = "python scripts/train_cleaner_ppo.py --n-iters 2 --frames-per-batch 64 --num-envs 4 --ppo-epochs 1 --minibatch-size 32 --output-dir .artifacts/cleaner_ppo_smoke"
