@@ -52,4 +52,21 @@ For a longer run:
 pixi run python scripts/train_cleaner_ppo.py --n-iters 20 --frames-per-batch 512 --num-envs 16 --ppo-epochs 4 --minibatch-size 256
 ```
 
-The training script follows the TorchRL MAPPO tutorial structure but adapts it to Cleaner: a shared masked categorical actor for the agents, a centralized critic for the shared team reward, `Collector`, GAE, and `ClipPPOLoss`. Add `--madpo-lite-coeff 0.01` to include the auxiliary adjacent-agent masked action-distribution divergence penalty. Metrics are written to `metrics.csv` and `learning_curve.png` in the selected output directory.
+The training script follows the TorchRL MAPPO tutorial structure but adapts it to Cleaner: tutorial-style per-agent observation keys, a masked categorical joint action, configurable centralized/decentralized actor and critic networks, configurable parameter sharing, `Collector`, GAE, and `ClipPPOLoss`. Add `--diversity-coeff 0.01` to include the auxiliary masked inter-agent cross-entropy diversity bonus. This is logged separately from PPO's own entropy bonus so we can compare individual stochastic exploration against inter-agent heterogeneity.
+
+Useful smoke checks:
+
+```bash
+pixi run ppo-smoke
+pixi run ppo-diversity-smoke
+pixi run ppo-mode-smoke
+```
+
+For a first single-seed sweep:
+
+```bash
+pixi run python scripts/run_cleaner_experiments.py --n-iters 40 --frames-per-batch 1024 --render-frequency 20
+pixi run python scripts/plot_cleaner_experiments.py .artifacts/experiments/cleaner_sweep
+```
+
+Each run writes `config.json`, `metrics.csv`, `learning_curve.png`, and optional policy GIF checkpoints. Metrics include reward, success rate, dirty-cell fraction, PPO entropy, cross-entropy diversity, PPO KL, gradient norm, and timing breakdowns for collection, value/GAE, loss, diversity bonus, backward, optimizer, and evaluation.
