@@ -46,27 +46,38 @@ This wraps the same `CustomCleaner` instance with TorchRL's `JumanjiWrapper`, ch
 pixi run ppo-smoke
 ```
 
-For a longer run:
+For a longer single-seed sanity run:
 
 ```bash
-pixi run python scripts/train_cleaner_ppo.py --n-iters 20 --frames-per-batch 512 --num-envs 16 --ppo-epochs 4 --minibatch-size 256
+pixi run python scripts/train_cleaner_ppo.py --n-iters 80 --frames-per-batch 4096 --num-envs 64
 ```
 
-The training script follows the TorchRL MAPPO tutorial structure but adapts it to Cleaner: tutorial-style per-agent observation keys, a masked categorical joint action, configurable centralized/decentralized actor and critic networks, configurable parameter sharing, `Collector`, GAE, and `ClipPPOLoss`. Add `--diversity-coeff 0.01` to include the auxiliary masked inter-agent cross-entropy diversity bonus. This is logged separately from PPO's own entropy bonus so we can compare individual stochastic exploration against inter-agent heterogeneity.
+The training script follows the TorchRL MAPPO tutorial structure but adapts it to Cleaner: tutorial-style per-agent observation keys, a masked categorical policy, configurable centralized/decentralized actor and critic networks, configurable parameter sharing, `Collector`, GAE, and `ClipPPOLoss`. The default encoder is now a Jumanji-style spatial CNN: per-agent actor inputs use dirty, wall, own-agent, and all-agents channels; the centralized critic sees dirty, wall, and all-agents channels. Use `--obs-clean-channel true` or `--obs-other-channel true` for richer ablations, and `--encoder mlp` to compare against the older flattened grid representation. The default timestep penalty is relaxed to `--penalty-per-timestep 0.1` for seminar experiments. The default PPO update is intentionally conservative (`--lr 5e-4`, `--ppo-epochs 4`) to reduce sharp policy collapse/recovery spikes. Training stops early once eval mode success is at least `0.95` and eval sample success is at least `0.85`; override this with `--early-stop-mode-success` and `--early-stop-sample-success`. Add `--diversity-coeff 0.001` to include the auxiliary masked inter-agent cross-entropy diversity bonus after the CNN baseline is stable. This is logged separately from PPO's own entropy bonus so we can compare individual stochastic exploration against inter-agent heterogeneity. Each run also saves the best evaluation checkpoint as `best_policy.pt` plus `best_policy.json`.
 
 Useful smoke checks:
 
 ```bash
+pixi run inspect-observation
+pixi run heuristic-rollout
 pixi run ppo-smoke
+pixi run ppo-mlp-smoke
 pixi run ppo-diversity-smoke
 pixi run ppo-mode-smoke
 ```
 
-For a first single-seed sweep:
+For a first seminar-style 3-seed baseline:
 
 ```bash
-pixi run python scripts/run_cleaner_experiments.py --n-iters 40 --frames-per-batch 1024 --render-frequency 20
-pixi run python scripts/plot_cleaner_experiments.py .artifacts/experiments/cleaner_sweep
+pixi run python scripts/run_cleaner_experiments.py \
+  --experiment-name stable_cnn_a2 \
+  --seeds 0 1 2 \
+  --small-agents 2 \
+  --large-agents \
+  --coeffs 0 \
+  --height 8 \
+  --width 8 \
+  --n-iters 300
+pixi run python scripts/plot_cleaner_experiments.py .artifacts/experiments/stable_cnn_a2 --individual
 ```
 
-Each run writes `config.json`, `metrics.csv`, `learning_curve.png`, and optional policy GIF checkpoints. Metrics include reward, success rate, dirty-cell fraction, PPO entropy, cross-entropy diversity, PPO KL, gradient norm, and timing breakdowns for collection, value/GAE, loss, diversity bonus, backward, optimizer, and evaluation.
+For the first baseline-vs-diversity comparison, keep the same command but use `--coeffs 0 0.0001 0.0003 0.001`. The plotter writes mean-plus-std curves across seeds and per-run summaries under `plots/`. Each run writes `config.json`, `metrics.csv`, `learning_curve.png`, `best_policy.pt`, `best_policy.json`, and optional policy GIF checkpoints. Metrics include RewardSum-based completed episode return, collector-window return for debugging, success rate, dirty-cell fraction, completion step, PPO entropy, clipped and raw cross-entropy diversity, PPO KL/clip fraction, gradient norm, and timing breakdowns for collection, value/GAE, loss, diversity bonus, backward, optimizer, and evaluation. The CE diversity bonus used in the loss is clipped by `--diversity-bonus-max 3.0` by default because raw cross-entropy is unbounded and can destabilize PPO at large coefficients.
