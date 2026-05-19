@@ -15,6 +15,9 @@ pillow = { version = ">=10.0", channel = "conda-forge" }
 requests = { version = ">=2.32", channel = "conda-forge" }
 pytorch = { version = "==2.5.1", build = "py3.11_cuda11.8_cudnn9.1.0_0", channel = "pytorch" }
 pytorch-cuda = "11.8.*"
+ipykernel = ">=7.2.0,<8"
+jupyterlab = ">=4.5.7,<5"
+ipympl = ">=0.10.0,<0.11"
 
 [pypi-dependencies]
 "marl-intro" = { path = ".", editable = true }
@@ -32,3 +35,4 @@ ppo-mode-smoke = "python scripts/train_cleaner_ppo.py --n-iters 1 --frames-per-b
 ppo-mlp-smoke = "python scripts/train_cleaner_ppo.py --encoder mlp --n-iters 1 --frames-per-batch 64 --num-envs 4 --ppo-epochs 1 --minibatch-size 32 --output-dir .artifacts/cleaner_ppo_mlp_smoke"
 inspect-observation = "python scripts/inspect_cleaner_observation.py --height 8 --width 8 --num-agents 2"
 heuristic-rollout = "python scripts/heuristic_cleaner_rollout.py --height 8 --width 8 --num-agents 2 --penalty-per-timestep 0.1 --rollout-length 64 --gif-path .artifacts/heuristic_cleaner_rollout.gif"
+notebook = "jupyter lab --ip 0.0.0.0 --no-browser notebooks/cleaner_torchrl_ppo_seminar.ipynb"

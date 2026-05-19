@@ -81,6 +81,9 @@ class TrainConfig:
     eval_frequency: int = 1
     early_stop_mode_success: float = 0.95
     early_stop_sample_success: float = 0.85
+    early_stop_patience: int = 5
+    early_stop_min_mode_success: float = 0.95
+    early_stop_min_sample_success: float = 0.75
     render_frequency: int = 0
     check_specs: bool = True
 
@@ -446,6 +449,9 @@ def parse_args() -> TrainConfig:
     parser.add_argument("--eval-frequency", type=int, default=TrainConfig.eval_frequency)
     parser.add_argument("--early-stop-mode-success", type=float, default=TrainConfig.early_stop_mode_success)
     parser.add_argument("--early-stop-sample-success", type=float, default=TrainConfig.early_stop_sample_success)
+    parser.add_argument("--early-stop-patience", type=int, default=TrainConfig.early_stop_patience)
+    parser.add_argument("--early-stop-min-mode-success", type=float, default=TrainConfig.early_stop_min_mode_success)
+    parser.add_argument("--early-stop-min-sample-success", type=float, default=TrainConfig.early_stop_min_sample_success)
     parser.add_argument("--render-frequency", type=int, default=TrainConfig.render_frequency)
     parser.add_argument("--skip-spec-check", action="store_true")
     args = parser.parse_args()
@@ -488,6 +494,9 @@ def parse_args() -> TrainConfig:
         eval_frequency=args.eval_frequency,
         early_stop_mode_success=args.early_stop_mode_success,
         early_stop_sample_success=args.early_stop_sample_success,
+        early_stop_patience=args.early_stop_patience,
+        early_stop_min_mode_success=args.early_stop_min_mode_success,
+        early_stop_min_sample_success=args.early_stop_min_sample_success,
         render_frequency=args.render_frequency,
         check_specs=not args.skip_spec_check,
     )
@@ -876,6 +885,33 @@ def write_metrics(output_dir: Path, metrics: list[dict[str, float]]) -> None:
     plt.close(fig)
 
 
+def should_stop_early(metrics: list[dict[str, float]], config: TrainConfig) -> tuple[bool, dict[str, float]]:
+    eval_rows = [
+        row
+        for row in metrics
+        if not torch.isnan(torch.tensor(row["eval_mode_success_rate"]))
+        and not torch.isnan(torch.tensor(row["eval_sample_success_rate"]))
+    ]
+    if len(eval_rows) < config.early_stop_patience:
+        return False, {}
+    window = eval_rows[-config.early_stop_patience :]
+    mode_values = [row["eval_mode_success_rate"] for row in window]
+    sample_values = [row["eval_sample_success_rate"] for row in window]
+    stats = {
+        "mode_mean": sum(mode_values) / len(mode_values),
+        "sample_mean": sum(sample_values) / len(sample_values),
+        "mode_min": min(mode_values),
+        "sample_min": min(sample_values),
+    }
+    stop = (
+        stats["mode_mean"] >= config.early_stop_mode_success
+        and stats["sample_mean"] >= config.early_stop_sample_success
+        and stats["mode_min"] >= config.early_stop_min_mode_success
+        and stats["sample_min"] >= config.early_stop_min_sample_success
+    )
+    return stop, stats
+
+
 def validate_config(config: TrainConfig) -> None:
     if config.frames_per_batch % config.num_envs != 0:
         raise ValueError("frames_per_batch must be divisible by num_envs for this seminar script")
@@ -889,6 +925,12 @@ def validate_config(config: TrainConfig) -> None:
         raise ValueError("early_stop_mode_success must be between 0 and 1")
     if not 0.0 <= config.early_stop_sample_success <= 1.0:
         raise ValueError("early_stop_sample_success must be between 0 and 1")
+    if config.early_stop_patience < 1:
+        raise ValueError("early_stop_patience must be >= 1")
+    if not 0.0 <= config.early_stop_min_mode_success <= 1.0:
+        raise ValueError("early_stop_min_mode_success must be between 0 and 1")
+    if not 0.0 <= config.early_stop_min_sample_success <= 1.0:
+        raise ValueError("early_stop_min_sample_success must be between 0 and 1")
     if config.diversity_sampled_pairs < 1:
         raise ValueError("diversity_sampled_pairs must be >= 1")
     if config.diversity_bonus_max < 0.0:
@@ -1116,14 +1158,14 @@ def main() -> None:
             f"ce={diversity_bonus_value:.4f} raw_ce={diversity_bonus_raw_value:.4f} time={row['elapsed_sec']:.1f}s"
         )
         write_metrics(output_dir, metrics)
-        if (
-            row["eval_mode_success_rate"] >= config.early_stop_mode_success
-            and row["eval_sample_success_rate"] >= config.early_stop_sample_success
-        ):
+        stop, stop_stats = should_stop_early(metrics, config)
+        if stop:
             print(
                 "early stopping: "
-                f"mode_sr={row['eval_mode_success_rate']:.3f} >= {config.early_stop_mode_success:.3f}, "
-                f"sample_sr={row['eval_sample_success_rate']:.3f} >= {config.early_stop_sample_success:.3f}"
+                f"last_{config.early_stop_patience}_mode_mean={stop_stats['mode_mean']:.3f} >= {config.early_stop_mode_success:.3f}, "
+                f"last_{config.early_stop_patience}_sample_mean={stop_stats['sample_mean']:.3f} >= {config.early_stop_sample_success:.3f}, "
+                f"mode_min={stop_stats['mode_min']:.3f} >= {config.early_stop_min_mode_success:.3f}, "
+                f"sample_min={stop_stats['sample_min']:.3f} >= {config.early_stop_min_sample_success:.3f}"
             )
             break
 
