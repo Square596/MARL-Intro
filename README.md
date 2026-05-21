@@ -1,6 +1,6 @@
 # MARL Intro Seminar
 
-Small scripts for checking Jumanji Cleaner before building the TorchRL seminar. The current demo avoids the registered `Cleaner-v0` maze generator and uses a deterministic, dimension-aware obstacle layout that is easier to explain in class.
+Small scripts for checking [Jumanji Cleaner](https://instadeepai.github.io/jumanji/environments/cleaner/) before building the [TorchRL](https://github.com/pytorch/rl) seminar. The current demo avoids the registered `Cleaner-v0` maze generator and uses a deterministic, dimension-aware obstacle layout that is easier to explain in class.
 
 ## Setup
 
@@ -8,7 +8,7 @@ Small scripts for checking Jumanji Cleaner before building the TorchRL seminar. 
 pixi install
 ```
 
-The project uses pixi because the next seminar steps need conda packages such as PyTorch, TensorDict, and TorchRL. Pixi installs the local `custom_cleaner` package in editable mode, keeps CUDA JAX available through the PyPI `jax[cuda12]` package, and installs CUDA-enabled PyTorch from the `pytorch`/`nvidia` conda channels.
+The project uses pixi because the next seminar steps need conda packages such as PyTorch, TensorDict, and [TorchRL](https://github.com/pytorch/rl). Pixi installs the local `custom_cleaner` package in editable mode, keeps CUDA JAX available through the PyPI `jax[cuda12]` package, installs [Jumanji](https://github.com/instadeepai/jumanji), and installs CUDA-enabled PyTorch from the `pytorch`/`nvidia` conda channels.
 
 ## Cleaner Smoke Test
 
@@ -38,13 +38,17 @@ pixi run python scripts/cleaner_smoke.py --height 10 --width 12 --num-agents 2 -
 pixi run python scripts/torchrl_jumanji_smoke.py --height 8 --width 8 --num-agents 3 --num-envs 4
 ```
 
-This wraps the same `CustomCleaner` instance with TorchRL's `JumanjiWrapper`, checks that both JAX and PyTorch see CUDA, and runs `reset`, `rand_step`, and a short rollout through TensorDicts. TorchRL is imported as `torchrl`; for manual Jumanji vectorization, prefer a wrapper such as `VmapWrapper` or `VmapAutoResetWrapper`.
+This wraps the same `CustomCleaner` instance with TorchRL's [`JumanjiWrapper`](https://docs.pytorch.org/rl/stable/reference/generated/torchrl.envs.libs.JumanjiWrapper.html), checks that both JAX and PyTorch see CUDA, and runs `reset`, `rand_step`, and a short rollout through TensorDicts. TorchRL is imported as `torchrl`; for manual Jumanji vectorization, prefer a wrapper such as `VmapWrapper` or `VmapAutoResetWrapper`.
+
+## Lecture Slides
+
+The final theory presentation is available as `slides/marl_seminar_theory.pdf`.
 
 ## Cleaner Seminar Notebook
 
 The runnable notebook version of the seminar is `notebooks/cleaner_torchrl_ppo_seminar.ipynb`. It is self-contained for teaching: it introduces Jumanji Cleaner, defines the fixed generator and TorchRL-compatible Cleaner subclass, inspects TensorDict rollouts, builds the current CNN actor/critic setup, runs a small PPO loop, and reads sweep summaries when available.
 
-Run it from the pixi environment on `rl2` so JAX, PyTorch, TorchRL, and CUDA match the scripts:
+Run it from the pixi environment on a CUDA-capable machine so JAX, PyTorch, TorchRL, and CUDA match the scripts:
 
 ```bash
 pixi run notebook
@@ -52,13 +56,17 @@ pixi run notebook
 
 If the GPU is shared with a sweep, keep `XLA_PYTHON_CLIENT_PREALLOCATE=false`; the notebook sets this before importing JAX. Jumanji selects the `ipympl` backend in notebooks, so the pixi env includes `ipympl`; the notebook switches back to `%matplotlib inline` after imports for normal inline learning-curve plots.
 
+## Additional Educational Notebook
+
+`notebooks/seminar_qmix_solved.ipynb` is another educational MARL notebook for QMIX and value decomposition. It is adapted from [FareedKhan-dev/all-rl-algorithms](https://github.com/FareedKhan-dev/all-rl-algorithms/tree/master), specifically the solved QMIX material.
+
 ## Cleaner PPO Training Setup
 
 ```bash
 pixi run ppo-smoke
 ```
 
-The current seminar training path is TorchRL PPO on `CustomCleaner`, following the MAPPO tutorial structure but adapted to the JAX/Jumanji Cleaner wrapper. The default setup is intentionally the one used for the active sweep:
+The current seminar training path is TorchRL PPO on `CustomCleaner`, following the [TorchRL multi-agent PPO tutorial](https://docs.pytorch.org/rl/stable/tutorials/multiagent_ppo.html) structure but adapted to the JAX/Jumanji Cleaner wrapper. The default setup is intentionally the one used for the active sweep:
 
 - decentralized actors: `--policy-centralized false`;
 - no actor parameter sharing: `--share-policy-params false`;
@@ -117,3 +125,11 @@ pixi run python scripts/plot_cleaner_experiments.py .artifacts/experiments/clean
 ```
 
 This creates one run per size, agent count, coefficient, and seed. The plotter groups by full config identity and aggregates only across seeds, carrying early-stopped runs forward at their final value. Plots are written per environment setting under `plots/by_env/<metric>/h{height}_w{width}_a{agents}.png`, so each chart compares only the coefficient lines for one size/agent count while sharing metric-level x/y limits across environment charts.
+
+## References And Third-Party Licenses
+
+- [Jumanji](https://github.com/instadeepai/jumanji) is used for the Cleaner environment API and is distributed under the Apache-2.0 license.
+- [TorchRL](https://github.com/pytorch/rl) is used for the `JumanjiWrapper`, TensorDict integration, collectors, and PPO components, and is distributed under the MIT license.
+- The QMIX educational notebook is adapted from [FareedKhan-dev/all-rl-algorithms](https://github.com/FareedKhan-dev/all-rl-algorithms/tree/master), which is distributed under the MIT license.
+
+This repository does not vendor Jumanji or TorchRL source code; it depends on them as third-party packages. Keep upstream copyright and license notices intact if code is copied into the repo in the future.
